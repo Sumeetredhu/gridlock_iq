@@ -21,3 +21,6 @@ cache/
 src/cache/
 *.pt
 node_modules/
+/yolov8n.onnx
+gridlock_iq_site.zip
+*.zip
