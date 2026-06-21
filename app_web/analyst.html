@@ -315,30 +315,43 @@ function lazy(id){
   if(id==='cv'&&!done.cv){done.cv=1;initCV();}
 }
 
+let CV_MODE='browser';   // 'server' if a YOLO backend is reachable, else in-browser ONNX
 function initCV(){
   const API=(window.GLIQ_API||'').replace(/\/$/,'');
   const status=document.getElementById('cv-status'),out=document.getElementById('cv-result');
-  const offline=()=>{status.textContent='detection server offline';status.style.color=C.orange;
-    out.innerHTML='<div class="note">Live detection needs the YOLO backend. <b>Locally:</b> run <code style="background:#0c1118;padding:4px 8px;border-radius:6px;color:#c7f031">python server.py</code> and open <b>http://localhost:8531/analyst.html</b>. <b>Deployed:</b> host the backend (see DEPLOY.md) and set its URL in <code style="background:#0c1118;padding:4px 8px;border-radius:6px;color:#c7f031">config.js</code>. (A static page alone can\'t run the model.)</div>'};
+  status.textContent='checking…';
   fetch(API+'/api/health').then(r=>r.ok?r.json():Promise.reject()).then(h=>{
-    if(h.yolo){status.textContent='● model ready';status.style.color=C.good}
-    else{status.textContent='YOLO not installed on server';status.style.color=C.orange}
-  }).catch(offline);
+    if(h.yolo){CV_MODE='server';status.textContent='● server model ready';status.style.color=C.good}
+    else throw 0;
+  }).catch(()=>{CV_MODE='browser';status.textContent='● runs in your browser — no server needed';status.style.color=C.good});
+
   const inp=document.getElementById('cv-file'),drop=document.getElementById('cv-drop');
   drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor=C.lime});
   drop.addEventListener('dragleave',e=>{e.preventDefault();drop.style.borderColor=''});
   drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='';if(e.dataTransfer.files[0])handle(e.dataTransfer.files[0])});
   inp.addEventListener('change',()=>{if(inp.files[0])handle(inp.files[0])});
+
   async function handle(file){
     const isVid=/video/.test(file.type)||/\.(mp4|mov|avi|mkv)$/i.test(file.name);
-    out.innerHTML='<div style="color:var(--mute);padding:14px">Running YOLOv8… (first run downloads weights, give it a few seconds)</div>';
+    if(CV_MODE==='server'){
+      out.innerHTML=msg('Running YOLOv8 on the server…');
+      try{const fd=new FormData();fd.append('file',file);
+        const r=await fetch(API+'/api/'+(isVid?'detect_video':'detect'),{method:'POST',body:fd});
+        if(!r.ok)throw new Error('server '+r.status);
+        render(await r.json(),isVid);
+      }catch(e){out.innerHTML='<div class="note">Server detection failed ('+e.message+').</div>'}
+      return;
+    }
+    // ---- in-browser (ONNX) mode ----
+    if(isVid){out.innerHTML='<div class="note">In-browser mode runs on <b>images</b>. For video, run the local server (<code style="background:#0c1118;padding:3px 7px;border-radius:6px;color:#c7f031">python server.py</code>).</div>';return}
+    out.innerHTML=msg('Loading the YOLOv8 model in your browser (~12 MB, first time only)…');
     try{
-      const fd=new FormData();fd.append('file',file);
-      const r=await fetch(API+'/api/'+(isVid?'detect_video':'detect'),{method:'POST',body:fd});
-      if(!r.ok)throw new Error('server '+r.status);
-      render(await r.json(),isVid);
-    }catch(e){out.innerHTML='<div class="note">Detection failed ('+e.message+'). Open this page via <b>python server.py</b> (port 8531), not file:// or a plain static server.</div>'}
+      const img=await fileToImage(file);
+      out.innerHTML=msg('Detecting…');
+      render(await detectInBrowser(img),false);
+    }catch(e){out.innerHTML='<div class="note">In-browser detection failed ('+e.message+'). Your browser may block WebAssembly — try Chrome/Edge, or run the local server.</div>'}
   }
+  const msg=t=>`<div style="color:var(--mute);padding:14px">${t}</div>`;
   const stat=(v,l,c)=>`<div style="text-align:center"><div style="font-family:'Archivo Black';font-size:28px;color:${c}">${v}</div><div style="color:${C.mute};font-size:12px">${l}</div></div>`;
   function render(res,isVid){
     if(isVid){
@@ -346,9 +359,58 @@ function initCV(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${res.images.map((im,i)=>`<div><img src="${im}" style="width:100%;border-radius:10px;border:1px solid var(--line)"><div style="color:${C.mute};font-size:11.5px;margin-top:3px">frame ${res.per_frame[i].frame} · ${res.per_frame[i].illegal} illegal</div></div>`).join('')}</div>`;
     }else{
       out.innerHTML=`<div style="display:flex;gap:24px;margin-bottom:14px">${stat(res.n_vehicles,'vehicles detected',C.lime)}${stat(res.n_illegal,'in no-parking zone',C.orange)}</div>
-        <img src="${res.image}" style="width:100%;border-radius:12px;border:1px solid var(--line)">`;
+        <img src="${res.image}" style="width:100%;border-radius:12px;border:1px solid var(--line)">
+        <div style="color:${C.mute};font-size:11.5px;margin-top:6px">${res.model||''}</div>`;
     }
   }
+}
+
+// ---------- in-browser YOLOv8 (onnxruntime-web) ----------
+const ORT_URL='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/';
+const VEH={2:'car',3:'motorcycle',5:'bus',7:'truck'};
+let _ortSession=null,_ortLoad=null;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load '+src));document.head.appendChild(s)})}
+async function getSession(){
+  if(_ortSession)return _ortSession;
+  if(_ortLoad)return _ortLoad;
+  _ortLoad=(async()=>{
+    if(!window.ort)await loadScript(ORT_URL+'ort.min.js');
+    ort.env.wasm.wasmPaths=ORT_URL;
+    _ortSession=await ort.InferenceSession.create('yolov8n.onnx',{executionProviders:['wasm']});
+    return _ortSession;
+  })();
+  return _ortLoad;
+}
+function fileToImage(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const im=new Image();im.onload=()=>{res(im);};im.onerror=()=>rej(new Error('bad image'));im.src=u})}
+function _iou(a,b){const x1=Math.max(a.x1,b.x1),y1=Math.max(a.y1,b.y1),x2=Math.min(a.x2,b.x2),y2=Math.min(a.y2,b.y2);const w=Math.max(0,x2-x1),h=Math.max(0,y2-y1),inter=w*h;return inter/((a.x2-a.x1)*(a.y2-a.y1)+(b.x2-b.x1)*(b.y2-b.y1)-inter+1e-9)}
+async function detectInBrowser(imgEl,conf=0.35){
+  const sess=await getSession();
+  const W=imgEl.naturalWidth||imgEl.width,H=imgEl.naturalHeight||imgEl.height,S=640;
+  const scale=Math.min(S/W,S/H),nW=Math.round(W*scale),nH=Math.round(H*scale),padX=(S-nW)/2,padY=(S-nH)/2;
+  const lc=document.createElement('canvas');lc.width=S;lc.height=S;const lx=lc.getContext('2d');
+  lx.fillStyle='rgb(114,114,114)';lx.fillRect(0,0,S,S);lx.drawImage(imgEl,padX,padY,nW,nH);
+  const d=lx.getImageData(0,0,S,S).data,f=new Float32Array(S*S*3),A=S*S;
+  for(let i=0;i<A;i++){f[i]=d[i*4]/255;f[A+i]=d[i*4+1]/255;f[2*A+i]=d[i*4+2]/255;}
+  const out=await sess.run({images:new ort.Tensor('float32',f,[1,3,S,S])});
+  const o=out[Object.keys(out)[0]],data=o.data,nc=o.dims[1],na=o.dims[2];
+  let boxes=[];
+  for(let i=0;i<na;i++){let best=0,bi=-1;for(let c=4;c<nc;c++){const v=data[c*na+i];if(v>best){best=v;bi=c-4;}}
+    if(best<conf||!(bi in VEH))continue;
+    const cx=data[i],cy=data[na+i],w=data[2*na+i],h=data[3*na+i];
+    boxes.push({x1:(cx-w/2-padX)/scale,y1:(cy-h/2-padY)/scale,x2:(cx+w/2-padX)/scale,y2:(cy+h/2-padY)/scale,score:best,cls:bi});}
+  boxes.sort((a,b)=>b.score-a.score);const keep=[];
+  for(const b of boxes){let ok=true;for(const k of keep)if(_iou(b,k)>0.45){ok=false;break;}if(ok)keep.push(b);}
+  const oc=document.createElement('canvas');oc.width=W;oc.height=H;const ox=oc.getContext('2d');
+  ox.drawImage(imgEl,0,0,W,H);const zoneY=H*0.55;
+  ox.fillStyle='rgba(220,40,40,0.16)';ox.fillRect(0,zoneY,W,H-zoneY);
+  ox.strokeStyle='rgba(220,40,40,0.8)';ox.lineWidth=Math.max(2,W/350);ox.strokeRect(0,zoneY,W,H-zoneY);
+  ox.font=`bold ${Math.max(13,Math.round(W/42))}px Inter, sans-serif`;ox.lineWidth=Math.max(2,W/300);
+  let nv=0,ni=0;
+  for(const b of keep){nv++;const ill=((b.y1+b.y2)/2)>zoneY;if(ill)ni++;
+    const col=ill?'#eb2828':'#28dc8c';ox.strokeStyle=col;ox.fillStyle=col;
+    ox.strokeRect(b.x1,b.y1,b.x2-b.x1,b.y2-b.y1);
+    ox.fillText(VEH[b.cls]+(ill?' · ILLEGAL':''),b.x1+2,Math.max(14,b.y1-5));}
+  return {n_vehicles:nv,n_illegal:ni,image:oc.toDataURL('image/jpeg',0.85),model:'YOLOv8n · in-browser (ONNX Runtime Web)'};
 }
 
 let ovHot,ovChr,ovFc;
