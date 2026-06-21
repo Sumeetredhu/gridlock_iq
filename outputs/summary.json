@@ -1,0 +1,173 @@
+{
+  "dataset": {
+    "tickets": 298450,
+    "date_min": "2023-11-10",
+    "date_max": "2024-04-08",
+    "stations": 54,
+    "junction_share_pct": 50.4,
+    "unique_vehicles": 231890
+  },
+  "cis": {
+    "total_cis": 6779128,
+    "mean_cis": 22.7,
+    "hex_cells": 2534,
+    "n_hot_cells": 64,
+    "hot_cells_cis_share_pct": 40.9,
+    "osm_geometry_match_pct": 100.0,
+    "explicit_osm_lane_tag_pct": 51.0
+  },
+  "forecast": {
+    "mae": 56.66,
+    "r2": 0.112,
+    "precision_at_k": 0.659,
+    "baseline_precision_at_k": 0.64,
+    "baseline_mae": 66.39,
+    "k": 30
+  },
+  "patrol": {
+    "capture_12_marshals_pct": 31.7,
+    "marshals_for_50pct": 24,
+    "stops_per_marshal": 6
+  },
+  "enforcement_quality": {
+    "reject_rate_pct": 30.1,
+    "model_roc_auc": 0.707,
+    "est_wasted_tickets": 90821,
+    "window_days": 150,
+    "est_officer_hours_saved_window": 6055,
+    "est_officer_hours_saved_annual": 14734
+  },
+  "chronic": {
+    "chronic_sites": 919,
+    "repeat_offenders_10plus": 711,
+    "worst_offender_violations": 55
+  },
+  "robustness": {
+    "n_draws": 300,
+    "jitter_pct": 25,
+    "topk": 20,
+    "top20_jaccard_median": 0.905,
+    "top20_jaccard_p05": 0.818,
+    "ranking_spearman_median": 0.998,
+    "cis_vs_count_top20_jaccard": 0.667,
+    "cis_vs_count_spearman": 0.965
+  },
+  "economics": {
+    "assumptions": {
+      "vot_inr_per_veh_hr": 250.0,
+      "ref_delay_veh_hr": 15.0,
+      "calib_vehhr_per_cisraw": 51.3,
+      "officer_cost_inr_per_hr": 300.0
+    },
+    "total_cost_inr_year": 2114856314,
+    "total_cost_cr_year": 211.5,
+    "hotspot_cost_cr_year": 86.5,
+    "hotspot_cost_share_pct": 40.9,
+    "delay_veh_hr_year": 8459425,
+    "patrol12_relieved_cr_year": 67.0,
+    "patrol12_cost_cr_year": 0.79,
+    "enforcement_roi_x": 84.9
+  },
+  "top_hotspots": [
+    {
+      "lat": 12.98,
+      "lon": 77.58,
+      "n": 12123,
+      "cis_sum": 289105.3,
+      "top_station": "Upparpet",
+      "top_road": "tertiary",
+      "junction_share": 1.0,
+      "sample_addr": "5th Main Road, Kempe Gowda Circle, Gandhi Nagar, Bengaluru, Karnataka. Pin-56000"
+    },
+    {
+      "lat": 12.98,
+      "lon": 77.58,
+      "n": 7369,
+      "cis_sum": 263260.31,
+      "top_station": "Upparpet",
+      "top_road": "residential",
+      "junction_share": 1.0,
+      "sample_addr": "3rd Main Road, Sri Kanakadasa Circle, Gandhi Nagar, Bengaluru, Karnataka. Pin-56"
+    },
+    {
+      "lat": 12.97,
+      "lon": 77.58,
+      "n": 5992,
+      "cis_sum": 216034.42,
+      "top_station": "Upparpet",
+      "top_road": "residential",
+      "junction_share": 1.0,
+      "sample_addr": "3rd Cross Road, Kempegowda Extension, Chickpete, Bengaluru, Karnataka. Pin-56000"
+    },
+    {
+      "lat": 12.98,
+      "lon": 77.61,
+      "n": 6667,
+      "cis_sum": 193413.93,
+      "top_station": "Shivajinagar",
+      "top_road": "tertiary",
+      "junction_share": 1.0,
+      "sample_addr": "Dispensary Road, Tasker Town, Shivaji Nagar, Bengaluru, Karnataka. Pin-560001 (I"
+    },
+    {
+      "lat": 12.96,
+      "lon": 77.58,
+      "n": 8585,
+      "cis_sum": 172933.15,
+      "top_station": "City Market",
+      "top_road": "primary",
+      "junction_share": 1.0,
+      "sample_addr": "Mysore Road, Sri Krishna Rajendra Market, Chickpete, Bengaluru, Karnataka. Pin-5"
+    },
+    {
+      "lat": 12.98,
+      "lon": 77.61,
+      "n": 4257,
+      "cis_sum": 139284.79,
+      "top_station": "Shivajinagar",
+      "top_road": "secondary",
+      "junction_share": 1.0,
+      "sample_addr": "Dickenson Road, Sri Nagamma Devi Circle, Sivanchetti Gardens, Bengaluru, Karnata"
+    },
+    {
+      "lat": 12.98,
+      "lon": 77.61,
+      "n": 4874,
+      "cis_sum": 106079.33,
+      "top_station": "Shivajinagar",
+      "top_road": "tertiary",
+      "junction_share": 0.45,
+      "sample_addr": "Kamaraj Road, Sri Nagamma Devi Circle, Sivanchetti Gardens, Bengaluru, Karnataka"
+    },
+    {
+      "lat": 13.0,
+      "lon": 77.55,
+      "n": 4293,
+      "cis_sum": 102028.65,
+      "top_station": "Rajajinagar",
+      "top_road": "tertiary",
+      "junction_share": 1.0,
+      "sample_addr": "10th Cross Road, Block 1, Rajaji Nagar, Bengaluru, Karnataka. Pin-560010 (India)"
+    },
+    {
+      "lat": 12.98,
+      "lon": 77.6,
+      "n": 3079,
+      "cis_sum": 97394.39,
+      "top_station": "Shivajinagar",
+      "top_road": "tertiary",
+      "junction_share": 1.0,
+      "sample_addr": "Meenakshi Koil Street, Shivaji Nagar, Bengaluru, Karnataka. Pin-560001 (India)"
+    },
+    {
+      "lat": 12.98,
+      "lon": 77.57,
+      "n": 2914,
+      "cis_sum": 86190.74,
+      "top_station": "Upparpet",
+      "top_road": "primary",
+      "junction_share": 1.0,
+      "sample_addr": "Major T Ramachandrappa Road, AT Extension, Gandhi Nagar, Bengaluru, Karnataka. P"
+    }
+  ]
+}

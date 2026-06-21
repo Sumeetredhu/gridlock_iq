@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GridLock IQ · Analyst Workbench</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet.css"/>
+<style>
+:root{--lime:#c7f031;--orange:#ff6a2b;--ink:#0c1118;--panel:#161a22;--panel2:#1d232e;
+  --line:#2a3442;--txt:#eaf1f8;--mute:#9fb3c8;--good:#16e0a3;--bad:#ff5d6c;--blue:#5fa8ff;--grid:rgba(255,255,255,.10)}
+*{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--ink);color:var(--txt)}
+.bp{position:fixed;inset:0;z-index:-2;background:radial-gradient(1200px 700px at 75% -10%,#3a86ff55,transparent 60%),linear-gradient(135deg,#1f6feb,#1349b0 60%,#0e337f)}
+.bp::before{content:"";position:absolute;inset:-2px;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:34px 34px;animation:pan 40s linear infinite}
+.bp::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.12) 50%,transparent 60%);mix-blend-mode:screen;animation:shine 16s ease-in-out infinite}
+@keyframes pan{to{background-position:340px 340px}}@keyframes shine{0%,100%{transform:translateX(-15%)}50%{transform:translateX(15%)}}
+.veil{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(8,12,18,.35),rgba(8,12,18,.78) 55%,var(--ink))}
+.wrap{max-width:1240px;margin:0 auto;padding:0 22px}
+header{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:rgba(10,15,22,.6);border-bottom:1px solid rgba(255,255,255,.08)}
+.bar{display:flex;align-items:center;gap:14px;height:58px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.5px}
+.logo .dot{width:11px;height:11px;border-radius:3px;background:var(--lime);box-shadow:0 0 14px var(--lime)}
+.role{font-size:12px;color:#0c1118;background:var(--blue);padding:4px 10px;border-radius:7px;font-weight:700}
+.live{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mute)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--good);animation:blink 1.6s infinite}@keyframes blink{50%{opacity:.25}}
+/* tab nav */
+.tabs{display:flex;gap:7px;flex-wrap:wrap;padding:16px 0 4px;position:sticky;top:58px;z-index:40}
+.tab{background:rgba(18,22,30,.85);backdrop-filter:blur(6px);border:1px solid var(--line);color:var(--mute);
+  padding:9px 15px;border-radius:11px;cursor:pointer;font-weight:600;font-size:13.5px;transition:.22s;white-space:nowrap}
+.tab:hover{transform:translateY(-2px);color:#fff;border-color:var(--lime)}
+.tab.on{background:var(--lime);color:#0c1118;border-color:var(--lime)}
+/* hero */
+.hero{padding:26px 0 6px}
+.kicker{color:var(--lime);font-weight:700;letter-spacing:3px;font-size:12.5px;text-transform:uppercase}
+h1{font-family:'Archivo Black',sans-serif;font-size:clamp(34px,5vw,58px);line-height:.95;color:#fff;margin-top:6px;text-shadow:0 14px 32px rgba(0,0,0,.35)}
+.sub{color:#e9f1ff;font-size:16px;margin-top:10px;max-width:720px}
+/* panels */
+.view{display:none;animation:fade .45s ease}.view.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+section{padding:18px 0 30px}
+.h2{font-family:'Archivo Black',sans-serif;font-size:26px;color:#fff}
+.lead{color:#dce8f7;font-size:15px;margin:7px 0 16px;max-width:840px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 36px rgba(0,0,0,.3)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:8px 0 20px}
+@media(max-width:980px){.kpis{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr!important}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;opacity:0;transform:translateY(16px);transition:.55s cubic-bezier(.2,.7,.2,1)}
+.card.in{opacity:1;transform:none}
+.card .big{font-family:'Archivo Black',sans-serif;font-size:32px;line-height:1;color:var(--lime)}
+.card .big.o{color:var(--orange)}.card .big.b{color:var(--blue)}.card .big.g{color:var(--good)}
+.card .lab{color:var(--mute);font-size:12.5px;margin-top:8px}
+.split{display:grid;grid-template-columns:1.45fr 1fr;gap:18px;align-items:start}
+.mapbox{height:480px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#0c1118}
+.mini{height:300px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#0c1118}
+.leaflet-container{background:#0c1118}
+.chartwrap{padding:16px;height:330px}
+.chartwrap.sm{height:280px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--mute);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px}
+td{color:var(--txt)}tr:hover td{background:var(--panel2)}
+.tablebox{max-height:430px;overflow:auto}
+.maptools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 13px;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px;display:flex;gap:7px;align-items:center;transition:.2s}
+.tbtn:hover{border-color:var(--lime)}.tbtn.on{background:var(--lime);color:#0c1118;border-color:var(--lime)}
+.tbtn .sw{width:10px;height:10px;border-radius:3px}
+.note{background:var(--panel2);border-left:3px solid var(--orange);border-radius:8px;padding:13px 15px;font-size:13.5px;color:var(--txt);margin-top:14px}
+.note.g{border-color:var(--good)}.note.l{border-color:var(--lime)}
+.formula{font-family:'Consolas',monospace;font-size:18px;background:#0f141d;border:1px solid var(--line);border-radius:12px;padding:18px;color:var(--txt)}
+.formula b{color:var(--lime)}.formula .o{color:var(--orange)}
+.steprow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+@media(max-width:980px){.steprow{grid-template-columns:1fr 1fr}}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.step .n{width:30px;height:30px;border-radius:8px;background:var(--lime);color:#0c1118;font-weight:800;display:grid;place-items:center;margin-bottom:8px}
+.step b{display:block;margin-bottom:4px}.step span{color:var(--mute);font-size:12.5px}
+.slider-row{display:flex;align-items:center;gap:14px;margin:4px 0 12px}
+input[type=range]{flex:1;accent-color:var(--lime)}
+.pct{font-family:'Archivo Black',sans-serif;font-size:50px;color:var(--lime);text-align:center;line-height:1}
+.stoplist{max-height:300px;overflow:auto}
+.stop{display:flex;gap:11px;align-items:center;padding:9px;border-radius:10px;background:var(--panel2);margin-bottom:7px;border:1px solid var(--line)}
+.stop .num{min-width:28px;height:28px;border-radius:7px;background:var(--lime);color:#0c1118;font-weight:800;display:grid;place-items:center;font-size:13px}
+.dock{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:5px;background:rgba(18,22,30,.92);backdrop-filter:blur(10px);border:1px solid #2c3543;border-radius:15px;padding:7px;box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.dock a{height:40px;padding:0 12px;border-radius:10px;display:flex;align-items:center;gap:7px;color:var(--mute);cursor:pointer;transition:.2s;font-size:13px;font-weight:600}
+.dock a:hover{background:var(--panel2);color:#fff}.dock a.on{background:var(--lime);color:#0c1118}
+.foot{color:#b9c9da;font-size:12px;text-align:center;padding:24px 0 96px;opacity:.85}
+.leaflet-popup-content{font-family:'Inter';font-size:13px}
+.pin{display:grid;place-items:center;font-weight:800;color:#0c1118;border-radius:50%;border:2px solid #0c1118}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:980px){.grid2{grid-template-columns:1fr}}
+.tag{display:inline-block;font-size:11px;font-weight:700;color:#0c1118;background:var(--orange);padding:3px 9px;border-radius:7px;margin-bottom:8px}
+.crd .loc{font-weight:800;font-size:15px}.crd .rec{color:var(--good);font-weight:600;font-size:13.5px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="bp"></div><div class="veil"></div>
+
+<header><div class="wrap bar">
+  <div class="logo"><span class="dot"></span> GridLock <span style="color:var(--lime)">IQ</span></div>
+  <span class="role">Analyst Workbench</span>
+  <div class="live"><i></i> connected · live model outputs</div>
+</div></header>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker">Deep-dive · planning & methodology</div>
+    <h1>Analyst Workbench</h1>
+    <p class="sub">The full technical view behind the patrol decisions — every model, metric and map, with the honest caveats. Pair it with the simpler <b style="color:var(--lime)">Police Command Center</b> for day-to-day use.</p>
+  </div>
+  <div class="tabs" id="tabs"></div>
+
+  <!-- OVERVIEW -->
+  <div class="view on" id="overview"><section>
+    <div class="kpis" id="kpis"></div>
+    <div class="split">
+      <div><div class="maptools" id="ov-tools"></div><div class="mapbox" id="ov-map"></div></div>
+      <div class="grid2" style="grid-template-columns:1fr">
+        <div class="panel chartwrap sm"><canvas id="vehChart"></canvas></div>
+        <div class="panel chartwrap sm"><canvas id="vioChart"></canvas></div>
+      </div>
+    </div>
+  </section></div>
+
+  <!-- HOTSPOTS -->
+  <div class="view" id="hotspots"><section>
+    <div class="h2">Statistically-significant hotspots</div>
+    <p class="lead">Getis-Ord Gi* on hex CIS, with Benjamini-Hochberg FDR over 2,534 simultaneous tests. Only genuinely significant cells survive.</p>
+    <div class="split">
+      <div class="mapbox" id="hot-map"></div>
+      <div class="panel" style="padding:14px"><div class="tablebox"><table id="hot-table"></table></div></div>
+    </div>
+    <div class="note l" id="robnote"></div>
+  </section></div>
+
+  <!-- FORECAST -->
+  <div class="view" id="forecast"><section>
+    <div class="h2">Next-shift forecast</div>
+    <p class="lead">LightGBM on temporal + static-location features, validated on a temporal holdout and benchmarked against a naive persistence baseline.</p>
+    <div class="kpis" id="fc-kpis"></div>
+    <div class="split">
+      <div class="mapbox" id="fc-map"></div>
+      <div class="panel chartwrap"><canvas id="hourChart"></canvas></div>
+    </div>
+    <div class="note">Honest read: the timestamp is enforcement/sync time, not the exact violation instant — so we treat time as a relative weight and lead with ranking accuracy (Precision@K), not absolute counts.</div>
+  </section></div>
+
+  <!-- PATROL -->
+  <div class="view" id="patrol"><section>
+    <div class="h2">Patrol optimizer</div>
+    <p class="lead">Greedy submodular max-coverage on forecast impact — provably within 63% of optimal and fully auditable. Drag to size the deployment.</p>
+    <div class="split">
+      <div><div class="panel" style="padding:18px;margin-bottom:14px">
+        <div class="slider-row"><b>Units</b><input type="range" id="units" min="1" max="30" value="12"><b id="unitval" style="color:var(--lime);min-width:26px">12</b></div>
+        <div class="pct" id="cappct">0%</div>
+        <div style="text-align:center;color:var(--mute);font-size:13px" id="planmeta"></div>
+      </div><div class="mapbox" id="patrol-map" style="height:330px"></div></div>
+      <div class="panel" style="padding:14px"><div style="font-weight:700;margin:2px 6px 10px">Coverage curve</div>
+        <div class="chartwrap sm" style="padding:4px"><canvas id="curveChart"></canvas></div>
+        <div class="stoplist" id="stoplist" style="margin-top:8px"></div></div>
+    </div>
+  </section></div>
+
+  <!-- QUALITY -->
+  <div class="view" id="quality"><section>
+    <div class="h2">Enforcement quality</div>
+    <p class="lead">A LightGBM model predicts which captures will be rejected, so review effort goes where it pays off. It prioritises — it never auto-rejects.</p>
+    <div class="kpis" id="q-kpis"></div>
+    <div class="panel chartwrap"><canvas id="rejChart"></canvas></div>
+  </section></div>
+
+  <!-- CHRONIC -->
+  <div class="view" id="chronic"><section>
+    <div class="h2">Chronic sites & repeat offenders</div>
+    <p class="lead">Spots ticketed almost daily need an engineering fix, not more patrols. And a few vehicles offend again and again.</p>
+    <div class="grid2">
+      <div><div style="font-weight:700;margin:2px 2px 10px">Top chronic micro-sites → recommended fix</div><div id="chronic-cards"></div></div>
+      <div><div style="font-weight:700;margin:2px 2px 10px">Repeat-offender leaderboard</div>
+        <div class="panel" style="padding:12px"><div class="tablebox"><table id="rep-table"></table></div></div></div>
+    </div>
+  </section></div>
+
+  <!-- METHODOLOGY -->
+  <div class="view" id="method"><section>
+    <div class="h2">Methodology & tech</div>
+    <p class="lead">How a ticket becomes a ranked, forecastable, priced congestion-impact value.</p>
+    <div class="formula" style="margin-bottom:14px"><b>CIS</b> = severity × vehicle&nbsp;size × <span class="o">(1 ÷ lanes)</span> × junction × peak</div>
+    <div class="steprow" id="pipeline"></div>
+    <div class="grid2" style="margin-top:18px">
+      <div class="panel" style="padding:18px"><b style="color:var(--lime)">The stack</b><div id="stack" style="margin-top:10px"></div></div>
+      <div class="panel" style="padding:18px"><b style="color:var(--orange)">Honest limitations</b>
+        <ul style="margin:10px 0 0 18px;color:var(--mute);font-size:13.5px;line-height:1.7">
+          <li>No ground-truth speeds — CIS is a relative index, validated by a ±25% weight-sensitivity sweep, not against measured delay.</li>
+          <li>Timestamp = enforcement/sync time, not the violation instant — time used as a relative weight only.</li>
+          <li>The rupee figure is a transparent planning estimate; durable results are the concentration & ROI.</li>
+          <li>We only see where police ticketed — the rejection model and CV feed help correct this bias.</li>
+        </ul></div>
+    </div>
+  </section></div>
+
+  <!-- CV -->
+  <div class="view" id="cv"><section>
+    <div class="h2">Live computer-vision detection</div>
+    <p class="lead">Real YOLOv8 — the same model as the pipeline, running right here. Drop in a street photo or short clip; vehicles inside the red kerb-side zone are flagged ILLEGAL and would auto-feed the CIS pipeline.</p>
+    <div class="panel" style="padding:22px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <b style="color:var(--lime);font-size:17px">YOLOv8 detector</b>
+        <span id="cv-status" style="font-size:12.5px;color:var(--mute)">checking server…</span>
+      </div>
+      <label id="cv-drop" for="cv-file" style="display:block;margin-top:14px;border:2px dashed var(--line);border-radius:14px;padding:34px;text-align:center;cursor:pointer;transition:.2s">
+        <div style="font-size:36px">📷</div>
+        <div style="font-weight:700;margin-top:6px">Drop or choose a street image / video</div>
+        <div style="color:var(--mute);font-size:12.5px;margin-top:4px">jpg · png · mp4 · mov — first run downloads the ~6 MB model</div>
+      </label>
+      <input id="cv-file" type="file" accept="image/*,video/*" style="display:none">
+      <div id="cv-result" style="margin-top:16px"></div>
+    </div>
+    <div class="grid2">
+      <div class="panel" style="padding:20px">
+        <b style="color:var(--lime);font-size:17px">Detect → Score → Map</b>
+        <div id="cvloop" style="margin-top:14px"></div>
+      </div>
+      <div class="panel" style="padding:20px">
+        <b style="color:var(--blue);font-size:17px">Why it matters</b>
+        <p style="margin-top:12px;color:var(--txt);font-size:14.5px;line-height:1.6">Today's 298k tickets are captured by marshals — slow and biased toward where they patrol. A camera feed removes both problems: every junction becomes a sensor, every detection is instantly scored for congestion impact and dropped onto the live map.</p>
+      </div>
+    </div>
+  </section></div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<nav class="dock" id="dock"></nav>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/chart.umd.min.js"></script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script>
+const TABS=[["overview","Overview"],["hotspots","Hotspots"],["forecast","Forecast"],["patrol","Patrol"],["quality","Quality"],["chronic","Chronic"],["method","Methodology"],["cv","CV"]];
+const C={lime:"#c7f031",orange:"#ff6a2b",mute:"#9fb3c8",txt:"#eaf1f8",blue:"#5fa8ff",good:"#16e0a3",hot:"#ff5d6c",hot95:"#ff9a3c",forecast:"#a86bff",grid:"rgba(255,255,255,.07)"};
+const easeOut=t=>1-Math.pow(1-t,3);
+function countUp(el,to,suf="",dur=1100){if(!el)return;let s=null;const f=t=>{if(!s)s=t;let p=Math.min((t-s)/dur,1);el.textContent=(Math.round(to*easeOut(p))).toLocaleString()+suf;if(p<1)requestAnimationFrame(f)};requestAnimationFrame(f);setTimeout(()=>{el.textContent=Math.round(to).toLocaleString()+suf},dur+120)}
+const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TOPT={attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19};
+function divIcon(t,col,sz){return L.divIcon({className:'',html:`<div class="pin" style="width:${sz}px;height:${sz}px;background:${col};font-size:${sz*.5}px">${t}</div>`,iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]})}
+
+let D, MAP={}, CH={}, done={};
+(window.GLIQ_DATA?Promise.resolve(window.GLIQ_DATA):fetch('data.json').then(r=>r.json()))
+  .then(d=>{D=d;boot()})
+  .catch(e=>{document.body.insertAdjacentHTML('afterbegin','<div style="padding:14px 22px;background:#b00020;color:#fff;font-family:Inter">Data failed to load. Keep <b>data.js</b> in the same folder as this file.</div>')});
+
+function kpi(big,lab,cls){return `<div class="card"><div class="big ${cls||''}">${big}</div><div class="lab">${lab}</div></div>`}
+function reveal(scope){const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target)}}),{threshold:.15});(scope||document).querySelectorAll('.card').forEach(c=>obs.observe(c))}
+
+function boot(){
+  const s=D.summary,cis=s.cis,pat=s.patrol,eq=s.enforcement_quality,ec=s.economics,rob=s.robustness,mf=s.forecast,ch=s.chronic;
+  // tabs + dock
+  const tb=document.getElementById('tabs'),dk=document.getElementById('dock');
+  TABS.forEach(([id,lab],i)=>{
+    const t=document.createElement('div');t.className='tab'+(i===0?' on':'');t.textContent=lab;t.onclick=()=>activate(id);tb.appendChild(t);
+    const a=document.createElement('a');a.className=(i===0?'on':'');a.textContent=lab;a.onclick=()=>activate(id);a.dataset.t=id;dk.appendChild(a);
+  });
+  // overview KPIs
+  document.getElementById('kpis').innerHTML=[
+    kpi((cis.total_cis/1e6).toFixed(2)+"M","total congestion-impact index"),
+    kpi(cis.n_hot_cells,"FDR-significant hotspot cells","o"),
+    kpi(cis.hot_cells_cis_share_pct+"%","impact inside those cells","o"),
+    kpi(cis.osm_geometry_match_pct+"%","coords snapped to OSM roads","b"),
+    kpi(Math.round(mf.precision_at_k*100)+"%","forecast Precision@30","b"),
+    kpi(pat.capture_12_marshals_pct+"%","cleared by 12 patrol units","g"),
+    kpi("₹"+ec.total_cost_cr_year+"cr","priced congestion / yr"),
+    kpi(ec.enforcement_roi_x+"×","enforcement ROI","g"),
+  ].join('');
+  reveal();
+  // forecast kpis
+  document.getElementById('fc-kpis').innerHTML=[
+    kpi(Math.round(mf.precision_at_k*100)+"%","model Precision@30"),
+    kpi(Math.round(mf.baseline_precision_at_k*100)+"%","naive baseline","o"),
+    kpi(mf.mae,"model MAE","b"),
+    kpi(mf.baseline_mae,"baseline MAE (15% worse)","o"),
+  ].join('');
+  // quality kpis
+  document.getElementById('q-kpis').innerHTML=[
+    kpi(eq.reject_rate_pct+"%","of reviewed tickets rejected","o"),
+    kpi(eq.model_roc_auc,"model ROC-AUC","b"),
+    kpi(eq.est_wasted_tickets.toLocaleString(),"est. wasted tickets","o"),
+    kpi("≈"+eq.est_officer_hours_saved_annual.toLocaleString(),"officer-hours/yr saved","g"),
+  ].join('');
+  document.getElementById('robnote').innerHTML=`<b style="color:${C.lime}">Robustness:</b> under ±${rob.jitter_pct}% weight noise (${rob.n_draws} draws) the top-${rob.topk} hotspots keep a median ${Math.round(rob.top20_jaccard_median*100)}% overlap (ranking Spearman ${rob.ranking_spearman_median}). The ranking does not depend on the hand-set weights.`;
+  buildTables();buildChronic();buildMethod();buildCV();
+  document.getElementById('foot').textContent='GridLock IQ · '+(s.dataset.tickets).toLocaleString()+' records · '+s.dataset.stations+' stations · '+s.dataset.date_min+' → '+s.dataset.date_max;
+  activate('overview');
+}
+
+function activate(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id===id));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',TABS[i][0]===id));
+  document.querySelectorAll('.dock a').forEach(a=>a.classList.toggle('on',a.dataset.t===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+  setTimeout(()=>lazy(id),60);
+}
+
+function makeMap(id,markers,fit){
+  const m=L.map(id,{scrollWheelZoom:false,zoomControl:true}).setView(D.center,12);
+  L.tileLayer(TILE,TOPT).addTo(m);markers(m);setTimeout(()=>m.invalidateSize(),80);return m;
+}
+function lazy(id){
+  if(id==='overview'&&!done.ov){done.ov=1;
+    MAP.ov=makeMap('ov-map',m=>{ovLayers(m)});initOvTools();drawVehVio();}
+  if(id==='hotspots'&&!done.hot){done.hot=1;
+    MAP.hot=makeMap('hot-map',m=>{D.hotspots.forEach(h=>{const c=(h.cls&&h.cls.indexOf('99')>=0)?C.hot:C.hot95;
+      L.circleMarker([h.lat,h.lon],{radius:Math.min(6+Math.sqrt(h.cis)/9,24),color:c,weight:1.4,fillColor:c,fillOpacity:.55}).addTo(m).bindPopup(`<b>${h.addr}</b><br>${h.station}<br>CIS ${h.cis.toLocaleString()} · ${h.n} tickets`)})});}
+  if(id==='forecast'&&!done.fc){done.fc=1;
+    MAP.fc=makeMap('fc-map',m=>{D.forecast.forEach(f=>L.circleMarker([f.lat,f.lon],{radius:Math.min(5+f.pred/120,20),color:C.forecast,weight:1,fillColor:C.forecast,fillOpacity:.5}).addTo(m).bindPopup('Predicted impact '+Math.round(f.pred)))});drawHour();}
+  if(id==='patrol'&&!done.pt){done.pt=1;MAP.pt=makeMap('patrol-map',()=>{});initPatrol();}
+  if(id==='quality'&&!done.q){done.q=1;drawRej();}
+  if(id==='cv'&&!done.cv){done.cv=1;initCV();}
+}
+
+function initCV(){
+  const API=(window.GLIQ_API||'').replace(/\/$/,'');
+  const status=document.getElementById('cv-status'),out=document.getElementById('cv-result');
+  const offline=()=>{status.textContent='detection server offline';status.style.color=C.orange;
+    out.innerHTML='<div class="note">Live detection needs the YOLO backend. <b>Locally:</b> run <code style="background:#0c1118;padding:4px 8px;border-radius:6px;color:#c7f031">python server.py</code> and open <b>http://localhost:8531/analyst.html</b>. <b>Deployed:</b> host the backend (see DEPLOY.md) and set its URL in <code style="background:#0c1118;padding:4px 8px;border-radius:6px;color:#c7f031">config.js</code>. (A static page alone can\'t run the model.)</div>'};
+  fetch(API+'/api/health').then(r=>r.ok?r.json():Promise.reject()).then(h=>{
+    if(h.yolo){status.textContent='● model ready';status.style.color=C.good}
+    else{status.textContent='YOLO not installed on server';status.style.color=C.orange}
+  }).catch(offline);
+  const inp=document.getElementById('cv-file'),drop=document.getElementById('cv-drop');
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor=C.lime});
+  drop.addEventListener('dragleave',e=>{e.preventDefault();drop.style.borderColor=''});
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='';if(e.dataTransfer.files[0])handle(e.dataTransfer.files[0])});
+  inp.addEventListener('change',()=>{if(inp.files[0])handle(inp.files[0])});
+  async function handle(file){
+    const isVid=/video/.test(file.type)||/\.(mp4|mov|avi|mkv)$/i.test(file.name);
+    out.innerHTML='<div style="color:var(--mute);padding:14px">Running YOLOv8… (first run downloads weights, give it a few seconds)</div>';
+    try{
+      const fd=new FormData();fd.append('file',file);
+      const r=await fetch(API+'/api/'+(isVid?'detect_video':'detect'),{method:'POST',body:fd});
+      if(!r.ok)throw new Error('server '+r.status);
+      render(await r.json(),isVid);
+    }catch(e){out.innerHTML='<div class="note">Detection failed ('+e.message+'). Open this page via <b>python server.py</b> (port 8531), not file:// or a plain static server.</div>'}
+  }
+  const stat=(v,l,c)=>`<div style="text-align:center"><div style="font-family:'Archivo Black';font-size:28px;color:${c}">${v}</div><div style="color:${C.mute};font-size:12px">${l}</div></div>`;
+  function render(res,isVid){
+    if(isVid){
+      out.innerHTML=`<div style="display:flex;gap:24px;margin-bottom:14px">${stat(res.total_vehicles,'vehicles',C.lime)}${stat(res.total_illegal_detections,'illegal detections',C.orange)}${stat(res.frames_sampled,'frames',C.blue)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${res.images.map((im,i)=>`<div><img src="${im}" style="width:100%;border-radius:10px;border:1px solid var(--line)"><div style="color:${C.mute};font-size:11.5px;margin-top:3px">frame ${res.per_frame[i].frame} · ${res.per_frame[i].illegal} illegal</div></div>`).join('')}</div>`;
+    }else{
+      out.innerHTML=`<div style="display:flex;gap:24px;margin-bottom:14px">${stat(res.n_vehicles,'vehicles detected',C.lime)}${stat(res.n_illegal,'in no-parking zone',C.orange)}</div>
+        <img src="${res.image}" style="width:100%;border-radius:12px;border:1px solid var(--line)">`;
+    }
+  }
+}
+
+let ovHot,ovChr,ovFc;
+function ovLayers(m){
+  ovHot=L.layerGroup(D.hotspots.map(h=>{const c=(h.cls&&h.cls.indexOf('99')>=0)?C.hot:C.hot95;
+    return L.circleMarker([h.lat,h.lon],{radius:Math.min(6+Math.sqrt(h.cis)/9,24),color:c,weight:1.3,fillColor:c,fillOpacity:.5}).bindPopup(`<b>${h.addr}</b><br>${h.station}<br>CIS ${h.cis.toLocaleString()}`)})).addTo(m);
+  ovChr=L.layerGroup(D.chronic.map(c=>L.marker([c.lat,c.lon],{icon:divIcon('⚠',C.orange,26)}).bindPopup(`<b>${c.addr}</b><br>${c.rec}`)));
+  ovFc=L.layerGroup(D.forecast.map(f=>L.circleMarker([f.lat,f.lon],{radius:6,color:C.forecast,weight:1,fillColor:C.forecast,fillOpacity:.45})));
+  MAP._ov={hot:ovHot,chronic:ovChr,forecast:ovFc};
+}
+function initOvTools(){
+  const defs=[["hot","Hotspots",C.hot],["chronic","Chronic",C.orange],["forecast","Forecast",C.forecast]];
+  const box=document.getElementById('ov-tools');
+  defs.forEach(([k,lab,col])=>{const b=document.createElement('div');b.className='tbtn'+(k==='hot'?' on':'');
+    b.innerHTML=`<span class="sw" style="background:${col}"></span>${lab}`;
+    b.onclick=()=>{const on=b.classList.toggle('on');const l=MAP._ov[k];if(on)l.addTo(MAP.ov);else MAP.ov.removeLayer(l)};box.appendChild(b)});
+}
+
+const copts=(title)=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:!!title,text:title,color:C.txt,font:{size:14,weight:'700'}}},
+  scales:{x:{ticks:{color:C.mute,font:{size:11}},grid:{color:C.grid}},y:{ticks:{color:C.mute,font:{size:11}},grid:{color:C.grid}}}});
+function drawVehVio(){
+  CH.veh=new Chart(document.getElementById('vehChart'),{type:'bar',data:{labels:D.impact_by_vehicle.map(x=>x.name),
+    datasets:[{data:D.impact_by_vehicle.map(x=>x.cis),backgroundColor:C.lime,borderRadius:6}]},options:{...copts('Congestion impact by vehicle type'),indexAxis:'y'}});
+  CH.vio=new Chart(document.getElementById('vioChart'),{type:'bar',data:{labels:D.impact_by_violation.map(x=>x.name),
+    datasets:[{data:D.impact_by_violation.map(x=>x.cis),backgroundColor:C.orange,borderRadius:6}]},options:{...copts('Congestion impact by violation type'),indexAxis:'y'}});
+}
+function drawHour(){
+  CH.hour=new Chart(document.getElementById('hourChart'),{type:'bar',data:{labels:[...Array(24).keys()].map(h=>h+':00'),
+    datasets:[{data:D.impact_by_hour,backgroundColor:C.blue,borderRadius:4}]},options:copts('Recorded impact by hour (enforcement time)')});
+}
+function drawRej(){
+  CH.rej=new Chart(document.getElementById('rejChart'),{type:'bar',data:{labels:D.rejection.map(r=>r.station),
+    datasets:[{data:D.rejection.map(r=>Math.round(r.prob*100)),backgroundColor:C.orange,borderRadius:6}]},
+    options:{...copts('Predicted rejection rate by station (%)'),indexAxis:'y'}});
+}
+function initPatrol(){
+  const sl=document.getElementById('units');sl.addEventListener('input',()=>render(+sl.value));
+  CH.curve=new Chart(document.getElementById('curveChart'),{type:'line',data:{labels:D.curve.map(c=>c.m),
+    datasets:[{data:D.curve.map(c=>c.pct),borderColor:C.lime,backgroundColor:'rgba(199,240,49,.14)',fill:true,tension:.3,pointRadius:0,borderWidth:2.5}]},
+    options:copts('% impact captured vs patrol units')});
+  let routeLayer=L.layerGroup().addTo(MAP.pt);
+  window._renderPatrol=render;render(12);
+  function render(n){
+    document.getElementById('unitval').textContent=n;
+    const stops=D.sequence.slice(0,n*6);const cap=stops.length?stops[stops.length-1].cum:0;
+    countUp(document.getElementById('cappct'),Math.round(cap),"%",700);
+    document.getElementById('planmeta').textContent=`${stops.length} stops · ${(cap/n).toFixed(1)}% per unit`;
+    const list=document.getElementById('stoplist');list.innerHTML='';
+    stops.slice(0,14).forEach((s,i)=>{const d=document.createElement('div');d.className='stop';
+      d.innerHTML=`<div class="num">${i+1}</div><div><div style="font-weight:600;font-size:13px">${s.addr}</div><div style="color:${C.mute};font-size:11.5px">clears ${s.gain.toLocaleString()} units</div></div>`;list.appendChild(d)});
+    routeLayer.clearLayers();stops.forEach((s,i)=>L.marker([s.lat,s.lon],{icon:divIcon(i+1,C.lime,i<12?24:16)}).addTo(routeLayer));
+  }
+}
+function buildTables(){
+  document.getElementById('hot-table').innerHTML='<tr><th>Location</th><th>Station</th><th>CIS</th><th>Gi* class</th></tr>'+
+    D.hotspots.filter(h=>h.cls&&h.cls.indexOf('hot')>=0).slice(0,30).map(h=>`<tr><td>${h.addr}</td><td>${h.station}</td><td>${h.cis.toLocaleString()}</td><td style="color:${C.hot}">${h.cls}</td></tr>`).join('');
+  document.getElementById('rep-table').innerHTML='<tr><th>Vehicle</th><th>Violations</th><th>Type</th><th>Station</th></tr>'+
+    D.repeat.map(r=>`<tr><td>${r.veh}</td><td><b>${r.n}</b></td><td>${r.type}</td><td>${r.station}</td></tr>`).join('');
+}
+function buildChronic(){
+  document.getElementById('chronic-cards').innerHTML=D.chronic.slice(0,6).map(c=>
+    `<div class="card crd in" style="margin-bottom:12px"><span class="tag">${c.days} days ticketed</span>
+     <div class="loc">${c.addr}</div><div style="color:${C.mute};font-size:12.5px">${c.n.toLocaleString()} tickets · ${c.road} road</div>
+     <div class="rec">→ ${c.rec}</div></div>`).join('');
+}
+function buildMethod(){
+  const steps=[["Clean","Parse the CSV, read IST time, flag junctions."],["Snap to OSM","Match each coord to the nearest of 580k roads for its lane count."],["Score (CIS)","Apply the formula per ticket."],["Hex grid","Bin into H3 hexagons (~0.1 km²)."]];
+  document.getElementById('pipeline').innerHTML=steps.map((s,i)=>`<div class="step"><div class="n">${i+1}</div><b>${s[0]}</b><span>${s[1]}</span></div>`).join('');
+  const stack=[["Data & ML","pandas · scikit-learn · LightGBM"],["Maps & roads","OpenStreetMap (osmnx) · H3 · Leaflet"],["Spatial stats","Getis-Ord Gi* (esda) + FDR"],["Optimisation","Greedy submodular max-coverage"],["Vision","YOLOv8 (ultralytics)"],["Apps","Streamlit · custom web dashboards"]];
+  document.getElementById('stack').innerHTML=stack.map(s=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span style="font-weight:600">${s[0]}</span><span style="color:${C.mute};font-family:Consolas,monospace;font-size:12px">${s[1]}</span></div>`).join('');
+}
+function buildCV(){
+  const loop=["Camera sees a stopped vehicle","YOLO checks the no-parking zone","CIS scores its congestion impact","It appears on the live map instantly"];
+  document.getElementById('cvloop').innerHTML=loop.map((t,i)=>`<div style="display:flex;gap:11px;align-items:center;margin-bottom:11px"><div style="min-width:28px;height:28px;border-radius:8px;background:${C.lime};color:#0c1118;font-weight:800;display:grid;place-items:center">${i+1}</div><div style="font-size:14px">${t}</div></div>`).join('');
+}
+</script>
+</body>
+</html>

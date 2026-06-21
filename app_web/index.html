@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GridLock IQ · Bengaluru Traffic Police</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet.css"/>
+<style>
+:root{
+  --blue:#1f6feb; --blue-deep:#1457c8; --grid:rgba(255,255,255,.10);
+  --lime:#c7f031; --orange:#ff6a2b; --ink:#0c1118; --panel:#161a22; --panel2:#1d232e;
+  --line:#2a3442; --txt:#eaf1f8; --mute:#9fb3c8; --good:#16e0a3; --bad:#ff5d6c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--ink);color:var(--txt);overflow-x:hidden}
+/* ---- animated blueprint backdrop ---- */
+.bp{position:fixed;inset:0;z-index:-2;background:
+  radial-gradient(1200px 700px at 75% -10%, #3a86ff55, transparent 60%),
+  linear-gradient(135deg,#1f6feb,#1349b0 60%,#0e337f);}
+.bp::before{content:"";position:absolute;inset:-2px;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:34px 34px;animation:pan 40s linear infinite;}
+.bp::after{content:"";position:absolute;inset:0;background:
+  linear-gradient(105deg,transparent 40%,rgba(255,255,255,.13) 50%,transparent 60%);mix-blend-mode:screen;animation:shine 14s ease-in-out infinite;}
+@keyframes pan{to{background-position:340px 340px}}
+@keyframes shine{0%,100%{transform:translateX(-15%)}50%{transform:translateX(15%)}}
+.veil{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,transparent,rgba(8,12,18,.55) 60%,var(--ink))}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+
+/* ---- top bar ---- */
+header{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+  background:rgba(10,15,22,.55);border-bottom:1px solid rgba(255,255,255,.08)}
+.bar{display:flex;align-items:center;gap:14px;height:60px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.5px}
+.logo .dot{width:11px;height:11px;border-radius:3px;background:var(--lime);box-shadow:0 0 14px var(--lime)}
+.badge{margin-left:auto;font-size:12px;color:#0c1118;background:var(--lime);padding:5px 11px;border-radius:8px;font-weight:700}
+.live{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mute)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--good);animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.25}}
+
+/* ---- hero ---- */
+.hero{padding:54px 0 26px;position:relative}
+.kicker{color:var(--lime);font-weight:700;letter-spacing:3px;font-size:13px;text-transform:uppercase}
+.frame{position:relative;display:inline-block;margin:8px 0 6px;padding:6px 4px}
+.frame .sel{position:absolute;inset:-14px -18px;border:2px solid var(--lime);border-radius:4px;pointer-events:none;opacity:.9}
+.frame .h{position:absolute;width:12px;height:12px;background:var(--lime);border:2px solid #0c1118;border-radius:2px}
+.frame .h.tl{top:-20px;left:-24px}.frame .h.tr{top:-20px;right:-24px}
+.frame .h.bl{bottom:-20px;left:-24px}.frame .h.br{bottom:-20px;right:-24px}
+h1{font-family:'Archivo Black',sans-serif;font-size:clamp(44px,8vw,104px);line-height:.92;letter-spacing:-1px;
+  color:#fff;text-shadow:0 18px 40px rgba(0,0,0,.35)}
+.sub{font-size:19px;color:#e9f1ff;max-width:640px;margin-top:16px;font-weight:500}
+.namechip{display:inline-block;margin-top:16px;background:var(--orange);color:#fff;font-weight:700;
+  font-size:13px;padding:7px 14px;border-radius:9px;box-shadow:0 8px 20px rgba(255,106,43,.35)}
+
+/* ---- kpi cards ---- */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:30px 0 8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px;
+  box-shadow:0 14px 30px rgba(0,0,0,.28);opacity:0;transform:translateY(18px);transition:.6s cubic-bezier(.2,.7,.2,1)}
+.card.in{opacity:1;transform:none}
+.card .big{font-family:'Archivo Black',sans-serif;font-size:40px;line-height:1;color:var(--lime)}
+.card .big.o{color:var(--orange)}.card .big.b{color:#65b1ff}.card .big.g{color:var(--good)}
+.card .lab{color:var(--mute);font-size:13px;margin-top:9px;font-weight:500}
+
+/* ---- sections ---- */
+section{padding:40px 0;scroll-margin-top:70px}
+.h2{font-family:'Archivo Black',sans-serif;font-size:30px;color:#fff;letter-spacing:-.5px}
+.lead{color:#dce8f7;font-size:15.5px;margin:8px 0 18px;max-width:760px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 40px rgba(0,0,0,.3)}
+
+/* map */
+#map{height:520px;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:#0c1118}
+.leaflet-container{background:#0c1118}
+.maptools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:9px 15px;border-radius:11px;
+  cursor:pointer;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:8px;transition:.25s}
+.tbtn:hover{border-color:var(--lime);transform:translateY(-2px)}
+.tbtn.on{background:var(--lime);color:#0c1118;border-color:var(--lime)}
+.tbtn .sw{width:11px;height:11px;border-radius:3px}
+
+.split{display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start}
+@media(max-width:900px){.split{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+
+/* patrol */
+.planbox{padding:20px}
+.slider-row{display:flex;align-items:center;gap:14px;margin:6px 0 16px}
+input[type=range]{flex:1;accent-color:var(--lime);height:6px}
+.capwrap{text-align:center;margin:4px 0 12px}
+.capwrap .pct{font-family:'Archivo Black',sans-serif;font-size:58px;color:var(--lime);line-height:1}
+.capwrap small{color:var(--mute);font-size:13px}
+.stoplist{max-height:330px;overflow:auto;padding-right:6px}
+.stop{display:flex;gap:12px;align-items:center;padding:10px;border-radius:11px;background:var(--panel2);
+  margin-bottom:8px;border:1px solid var(--line);opacity:0;transform:translateX(12px);animation:slidein .4s forwards}
+@keyframes slidein{to{opacity:1;transform:none}}
+.stop .num{min-width:30px;height:30px;border-radius:8px;background:var(--lime);color:#0c1118;font-weight:800;
+  display:grid;place-items:center;font-size:14px}
+.stop .addr{font-weight:600;font-size:14px}.stop .meta{color:var(--mute);font-size:12px}
+
+/* chronic cards */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:900px){.grid3{grid-template-columns:1fr}}
+.crd{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;
+  opacity:0;transform:translateY(18px);transition:.6s cubic-bezier(.2,.7,.2,1)}
+.crd.in{opacity:1;transform:none}
+.crd .tag{display:inline-block;font-size:11px;font-weight:700;color:#0c1118;background:var(--orange);
+  padding:3px 9px;border-radius:7px;margin-bottom:9px}
+.crd .loc{font-weight:800;font-size:16px;margin-bottom:4px}
+.crd .det{color:var(--mute);font-size:12.5px;margin-bottom:10px}
+.crd .rec{font-size:14px;color:var(--good);font-weight:600;line-height:1.35}
+
+/* bars */
+.barrow{display:flex;align-items:center;gap:12px;margin:9px 0}
+.barrow .nm{width:150px;font-size:13px;color:var(--txt)}
+.barrow .track{flex:1;height:14px;background:var(--panel2);border-radius:8px;overflow:hidden}
+.barrow .fill{height:100%;width:0;background:linear-gradient(90deg,var(--orange),#ff9a5b);border-radius:8px;transition:width 1s cubic-bezier(.2,.7,.2,1)}
+.barrow .v{width:54px;text-align:right;color:var(--mute);font-size:12.5px}
+
+/* dock toolbar */
+.dock{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:6px;
+  background:rgba(18,22,30,.92);backdrop-filter:blur(10px);border:1px solid #2c3543;border-radius:16px;
+  padding:8px;box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.dock a{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;color:var(--mute);
+  cursor:pointer;transition:.2s;position:relative;text-decoration:none;font-size:18px}
+.dock a:hover{background:var(--panel2);color:#fff;transform:translateY(-3px)}
+.dock a.on{background:var(--lime);color:#0c1118}
+.dock a span{position:absolute;bottom:52px;background:#0c1118;color:#fff;font-size:11px;padding:4px 8px;
+  border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:.2s;font-family:'Inter'}
+.dock a:hover span{opacity:1}
+.foot{color:#b9c9da;font-size:12px;text-align:center;padding:30px 0 90px;opacity:.8}
+.leaflet-popup-content{font-family:'Inter';font-size:13px}
+.pin{display:grid;place-items:center;font-weight:800;color:#0c1118;border-radius:50%;border:2px solid #0c1118;box-shadow:0 3px 8px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+<div class="bp"></div><div class="veil"></div>
+
+<header><div class="wrap bar">
+  <div class="logo"><span class="dot"></span> GridLock <span style="color:var(--lime)">IQ</span></div>
+  <div class="live"><i></i> Live · Bengaluru Traffic Police</div>
+  <div class="badge" id="today">2026</div>
+</div></header>
+
+<main class="wrap">
+  <!-- HERO -->
+  <section class="hero" id="home">
+    <div class="kicker">Parking-Induced Congestion · Command Center</div>
+    <div class="frame">
+      <span class="sel"></span><span class="h tl"></span><span class="h tr"></span><span class="h bl"></span><span class="h br"></span>
+      <h1>SEE IT.<br>CLEAR IT.</h1>
+    </div>
+    <p class="sub">We don't just count parking tickets — we measure the traffic each violation steals, then tell your units exactly where to go first.</p>
+    <div class="namechip" id="window">Bengaluru · 2024</div>
+
+    <div class="kpis">
+      <div class="card"><div class="big" data-c="0" id="k1">0</div><div class="lab">hotspot zones causing most congestion</div></div>
+      <div class="card"><div class="big o" data-c="0" id="k2">0</div><div class="lab">% of city congestion in those zones</div></div>
+      <div class="card"><div class="big b" data-c="0" id="k3">0</div><div class="lab">% relieved by today's patrol plan</div></div>
+      <div class="card"><div class="big g" data-c="0" id="k4">0</div><div class="lab">officer-hours/yr saved from bad tickets</div></div>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section id="map-sec">
+    <div class="h2">Live congestion map</div>
+    <p class="lead">Switch layers to see where illegal parking hurts traffic, where to send patrols today, and which spots need a permanent fix.</p>
+    <div class="maptools" id="maptools"></div>
+    <div id="map"></div>
+  </section>
+
+  <!-- PATROL -->
+  <section id="patrol-sec">
+    <div class="h2">Today's patrol plan</div>
+    <p class="lead">Pick how many units you can deploy. We place them to clear the most congestion possible — and show you the exact stops, in order.</p>
+    <div class="split">
+      <div class="panel planbox">
+        <div class="slider-row"><b>Units</b>
+          <input type="range" id="units" min="1" max="30" value="12"/>
+          <b id="unitval" style="color:var(--lime);min-width:28px">12</b></div>
+        <div class="capwrap"><div class="pct" id="cappct">0%</div>
+          <small>of the city's parking-induced congestion cleared this shift</small></div>
+        <div id="planmeta" style="color:var(--mute);font-size:13px;text-align:center"></div>
+      </div>
+      <div class="panel" style="padding:16px">
+        <div style="font-weight:700;margin:4px 6px 10px">Send units here first</div>
+        <div class="stoplist" id="stoplist"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHRONIC -->
+  <section id="fix-sec">
+    <div class="h2">Spots that need a fix, not more tickets</div>
+    <p class="lead">These places are ticketed almost every day yet never improve. Patrolling them is wasted effort — here's the recommended permanent fix.</p>
+    <div class="grid3" id="chronic"></div>
+  </section>
+
+  <!-- QUALITY -->
+  <section id="quality-sec">
+    <div class="h2">Where enforcement effort is wasted</div>
+    <p class="lead">Nearly a third of reviewed tickets get rejected. These stations have the highest predicted rejection — screen those captures first to save officer time.</p>
+    <div class="panel" style="padding:22px"><div id="rejbars"></div></div>
+  </section>
+
+  <div class="foot" id="foot"></div>
+</main>
+
+<nav class="dock">
+  <a data-go="home" class="on">🏠<span>Home</span></a>
+  <a data-go="map-sec">🗺️<span>Map</span></a>
+  <a data-go="patrol-sec">🚓<span>Patrol plan</span></a>
+  <a data-go="fix-sec">🛠️<span>Fixes</span></a>
+  <a data-go="quality-sec">✅<span>Quality</span></a>
+</nav>
+
+<script src="vendor/leaflet.js"></script>
+<script src="data.js"></script>
+<script>
+const easeOut=t=>1-Math.pow(1-t,3);
+function countUp(el,to,suffix="",dur=1200){if(!el)return;let s=null;const f=t=>{if(!s)s=t;let p=Math.min((t-s)/dur,1);
+  el.textContent=Math.round(to*easeOut(p)).toLocaleString()+suffix;if(p<1)requestAnimationFrame(f)};requestAnimationFrame(f);
+  setTimeout(()=>{el.textContent=Math.round(to).toLocaleString()+suffix},dur+120)}
+
+let DATA, map, layers={}, routeLayer;
+const COL={hot:"#ff5d6c",hot95:"#ff9a3c",patrol:"#c7f031",chronic:"#ffb02e",forecast:"#a86bff"};
+
+(window.GLIQ_DATA?Promise.resolve(window.GLIQ_DATA):fetch('data.json').then(r=>r.json()))
+  .then(d=>{DATA=d;boot()})
+  .catch(e=>{document.body.insertAdjacentHTML('afterbegin','<div style="padding:14px 22px;background:#b00020;color:#fff;font-family:Inter">Data failed to load. Keep <b>data.js</b> in the same folder as this file, or run via a local server.</div>')});
+
+function boot(){
+  const s=DATA.summary, cis=s.cis||{}, pat=s.patrol||{}, eq=s.enforcement_quality||{};
+  document.getElementById('window').textContent='Bengaluru · '+(s.dataset.date_min||'')+' → '+(s.dataset.date_max||'');
+  // KPIs
+  const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target)}}),{threshold:.2});
+  document.querySelectorAll('.card,.crd').forEach(c=>obs.observe(c));
+  setTimeout(()=>{countUp(document.getElementById('k1'),cis.n_hot_cells||0);
+    countUp(document.getElementById('k2'),Math.round(cis.hot_cells_cis_share_pct||0),"%");
+    countUp(document.getElementById('k3'),Math.round(pat.capture_12_marshals_pct||0),"%");
+    countUp(document.getElementById('k4'),eq.est_officer_hours_saved_annual||0);},350);
+  initMap(); initMapTools(); buildChronic(); buildRej(); initPatrol(); initDock();
+  document.getElementById('foot').textContent='GridLock IQ · built on '+(s.dataset.tickets||0).toLocaleString()+' real enforcement records · '+(s.dataset.stations||0)+' stations';
+}
+
+function initMap(){
+  map=L.map('map',{zoomControl:true,scrollWheelZoom:false}).setView(DATA.center,12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+  // hotspots
+  layers.hot=L.layerGroup(DATA.hotspots.map(h=>{
+    const r=6+Math.sqrt(h.cis)/9;
+    const col=(h.cls&&h.cls.indexOf('99')>=0)?COL.hot:COL.hot95;
+    return L.circleMarker([h.lat,h.lon],{radius:Math.min(r,26),color:col,weight:1.5,fillOpacity:.55,fillColor:col})
+      .bindPopup(`<b>${h.addr}</b><br>${h.station} · ${h.road}<br>Impact score <b>${h.cis.toLocaleString()}</b> · ${h.n} tickets`);
+  }));
+  // chronic
+  layers.chronic=L.layerGroup(DATA.chronic.map(c=>L.marker([c.lat,c.lon],{icon:divIcon('⚠',COL.chronic,30)})
+      .bindPopup(`<b>${c.addr}</b><br>Ticketed ${c.days} days · ${c.n} tickets<br><b style="color:#c8651a">Fix:</b> ${c.rec}`)));
+  // forecast
+  layers.forecast=L.layerGroup(DATA.forecast.map(f=>L.circleMarker([f.lat,f.lon],{radius:Math.min(5+f.pred/120,22),
+      color:COL.forecast,weight:1,fillOpacity:.5,fillColor:COL.forecast}).bindPopup(`Predicted impact <b>${Math.round(f.pred)}</b>`)));
+  routeLayer=L.layerGroup();
+  layers.hot.addTo(map);
+}
+function divIcon(txt,col,sz){return L.divIcon({className:'',html:`<div class="pin" style="width:${sz}px;height:${sz}px;background:${col};font-size:${sz*.5}px">${txt}</div>`,iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]})}
+
+const LAYERDEF=[["hot","Hotspots",COL.hot],["patrol","Today's patrol",COL.patrol],["chronic","Needs a fix",COL.chronic],["forecast","Tomorrow's risk",COL.forecast]];
+function initMapTools(){
+  const box=document.getElementById('maptools');
+  LAYERDEF.forEach(([k,lab,col],i)=>{
+    const b=document.createElement('div');b.className='tbtn'+(k==='hot'?' on':'');
+    b.innerHTML=`<span class="sw" style="background:${col}"></span>${lab}`;
+    b.onclick=()=>{const on=b.classList.toggle('on');
+      const lay=k==='patrol'?routeLayer:layers[k];
+      if(on)lay.addTo(map);else map.removeLayer(lay);};
+    box.appendChild(b);
+  });
+}
+
+function initPatrol(){
+  const sl=document.getElementById('units');
+  sl.addEventListener('input',()=>render(+sl.value));
+  render(12);
+  function render(n){
+    document.getElementById('unitval').textContent=n;
+    const stops=DATA.sequence.slice(0,n*6);
+    const cap=stops.length?stops[stops.length-1].cum:0;
+    const el=document.getElementById('cappct');countUp(el,Math.round(cap),"%",700);
+    document.getElementById('planmeta').textContent=`${stops.length} stops · ${n} units · ${(cap/n).toFixed(1)}% cleared per unit`;
+    // list
+    const list=document.getElementById('stoplist');list.innerHTML='';
+    stops.slice(0,18).forEach((s,i)=>{const d=document.createElement('div');d.className='stop';d.style.animationDelay=(i*30)+'ms';
+      d.innerHTML=`<div class="num">${i+1}</div><div><div class="addr">${s.addr}</div><div class="meta">clears ${s.gain.toLocaleString()} impact units</div></div>`;
+      list.appendChild(d)});
+    // map route
+    routeLayer.clearLayers();
+    stops.forEach((s,i)=>L.marker([s.lat,s.lon],{icon:divIcon(i+1,COL.patrol,i<12?26:18)}).addTo(routeLayer));
+  }
+}
+
+function buildChronic(){
+  const box=document.getElementById('chronic');
+  DATA.chronic.slice(0,9).forEach(c=>{const d=document.createElement('div');d.className='crd';
+    d.innerHTML=`<span class="tag">${c.days} days/${'~150'} ticketed</span>
+      <div class="loc">${c.addr}</div>
+      <div class="det">${c.n.toLocaleString()} tickets · ${c.road} road</div>
+      <div class="rec">→ ${c.rec}</div>`;box.appendChild(d)});
+  const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target)}}),{threshold:.15});
+  box.querySelectorAll('.crd').forEach(c=>obs.observe(c));
+}
+
+function buildRej(){
+  const box=document.getElementById('rejbars');const max=Math.max(...DATA.rejection.map(r=>r.prob));
+  DATA.rejection.forEach((r,i)=>{const row=document.createElement('div');row.className='barrow';
+    row.innerHTML=`<div class="nm">${r.station}</div><div class="track"><div class="fill"></div></div><div class="v">${Math.round(r.prob*100)}%</div>`;
+    box.appendChild(row);
+    const f=row.querySelector('.fill');
+    const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){setTimeout(()=>f.style.width=(r.prob/max*100)+'%',i*60);obs.unobserve(e.target)}}),{threshold:.4});
+    obs.observe(row);});
+}
+
+function initDock(){
+  const links=[...document.querySelectorAll('.dock a')];
+  links.forEach(a=>a.onclick=e=>{e.preventDefault();const t=document.getElementById(a.dataset.go==='home'?'home':a.dataset.go);
+    t.scrollIntoView({behavior:'smooth'});});
+  const map={home:'home','map-sec':'map-sec','patrol-sec':'patrol-sec','fix-sec':'fix-sec','quality-sec':'quality-sec'};
+  const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
+    links.forEach(l=>l.classList.toggle('on',l.dataset.go===e.target.id))}}),{threshold:.5});
+  Object.values(map).forEach(id=>{const el=document.getElementById(id);if(el)obs.observe(el)});
+}
+</script>
+</body>
+</html>

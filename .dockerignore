@@ -1,0 +1,13 @@
+data/
+deck/
+deck_render/
+reports/
+outputs/*.log
+*.pptx
+*.pdf
+*.JPG
+__pycache__/
+*.pyc
+.git/
+app/
+yolov8n.pt

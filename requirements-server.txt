@@ -1,0 +1,5 @@
+# Minimal deps for the GridLock IQ web/CV server (server.py).
+# ultralytics pulls in torch, numpy and opencv automatically.
+flask>=3.0
+ultralytics>=8.2
+pillow>=10
