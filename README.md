@@ -2,6 +2,9 @@
 
 **Flipkart GRiD · ML track** · *Bengaluru Traffic Police parking-enforcement data*
 
+### 🔴 Live demo: **https://gridlock-iq.netlify.app** &nbsp;·&nbsp; [Analyst dashboard](https://gridlock-iq.netlify.app/analyst.html)
+*Both dashboards + live in-browser YOLOv8 detection — runs with no backend.*
+
 > **Problem:** On-street illegal & spillover parking chokes carriageways and junctions.
 > Enforcement is patrol-based and reactive, there's no map of *violations vs. congestion
 > impact*, and no way to prioritize where to send limited marshals.
